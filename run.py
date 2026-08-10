@@ -44,6 +44,7 @@ def main():
     
     # Text generation model
     parser.add_argument("--model", type=str, help="Model to use")
+    parser.add_argument("--model_host", type=str, default=None, help="Host of the OpenAI-compatible endpoint (e.g. vLLM server)")
     parser.add_argument("--deploy_name", type=str, default=None, help="Deployname of the model to use")
     parser.add_argument("--azure", action="store_true", default=False, help="Azure openai API")
     parser.add_argument("--provider", type=str, default="openai", choices=["openai", "snowflake"],
@@ -82,7 +83,7 @@ def main():
     elif args.azure:
         client = AzureOpenAIClient(model=args.model, deploy_name=args.deploy_name)
     else:
-        client = OpenAICompatibleClient(model=args.model)
+        client = OpenAICompatibleClient(model=args.model, model_host=args.model_host)
 
 
     # compute prompt length

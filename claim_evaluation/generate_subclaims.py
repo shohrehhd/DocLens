@@ -1,52 +1,19 @@
 import argparse
 import os
+import sys
 import json
-import time
 from tqdm import tqdm
 from copy import deepcopy
 import numpy as np
 import re
 
-import openai
-import openai.error
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from client_utils import AzureOpenAIClient, OpenAICompatibleClient
 
 MIN_CLAIM = 1
 MAX_CLAIM = 30
 
 SECTION_DIVISIONS = ['subjective', 'objective_exam', 'objective_results', 'assessment_and_plan']
-
-def completion_with_backoff(**kwargs):
-    is_ok = False
-    retry_count = 0
-    while not is_ok:
-        retry_count += 1
-        try:
-            response = openai.ChatCompletion.create(**kwargs)
-            is_ok = True
-        except openai.error.RateLimitError as error:
-            if retry_count <= 30:
-                if retry_count % 10 == 0:
-                    print(f"OpenAI API retry for {retry_count} times ({error})")
-                time.sleep(10)
-                continue
-            else:
-                return {}
-        except openai.error.InvalidRequestError as error:
-            if 'maximum context length' in error._message:
-                if retry_count <= 3:
-                    print(f"reduce max_tokens by 500")
-                    kwargs['max_tokens'] = kwargs['max_tokens'] - 500
-                    continue
-                else:
-                    print(error)
-                    return {}
-            else:
-                print(error)
-                return {}
-        except Exception as error:
-            print(error)
-            return {}
-    return response
 
 
 if __name__ == "__main__" :
@@ -63,23 +30,20 @@ if __name__ == "__main__" :
     # claim generation model
     parser.add_argument('--prompt_file', required=True, help='filename of the prompt dict .json.')
     parser.add_argument("--azure", action="store_true", default=False, help="Azure openai API")
+    parser.add_argument("--model_host", type=str, default=None, help="Host of the OpenAI-compatible endpoint (e.g. vLLM server)")
     parser.add_argument("--max_new_tokens", type=int, default=2000, help="Max number of new tokens to generate in one step")
-    
+
     args = parser.parse_args()
-    
+
     eval_file, result_file, mode, prompt_file, max_new_tokens = args.eval_file, args.result_file, args.mode, args.prompt_file, args.max_new_tokens
-    
+
     if args.azure:
-        openai.api_base = os.environ.get("OPENAI_API_BASE")
-        openai.api_key = os.environ.get("OPENAI_API_KEY")
-        openai.api_type = "azure"
-        openai.api_version = "2023-05-15"
         CLAIM_EXTRACTOR_NAME = CLAIM_EXTRACTOR_DEPLOY_NAME = "gpt-4-1106-preview"
         # CLAIM_EXTRACTOR_NAME = CLAIM_EXTRACTOR_DEPLOY_NAME = "gpt-35-turbo"
+        client = AzureOpenAIClient(model=CLAIM_EXTRACTOR_NAME, deploy_name=CLAIM_EXTRACTOR_DEPLOY_NAME)
     else:
-        openai.api_base = "https://api.openai.com/v1"
-        openai.api_key = os.environ.get("OPENAI_API_KEY_OPENAI")
         CLAIM_EXTRACTOR_NAME = "gpt-4-1106-preview"
+        client = OpenAICompatibleClient(model=CLAIM_EXTRACTOR_NAME, model_host=args.model_host)
     
     if mode == 'reference_claims':
         assert eval_file is not None
@@ -140,17 +104,12 @@ if __name__ == "__main__" :
                 item[claim_key] = []
                 continue
             
-            if args.azure:
-                response = completion_with_backoff(
-                    engine=CLAIM_EXTRACTOR_DEPLOY_NAME, model=CLAIM_EXTRACTOR_NAME, messages=prompt, max_tokens=max_new_tokens
-                )
-            else:
-                response = completion_with_backoff(
-                    model=CLAIM_EXTRACTOR_NAME, messages=prompt, max_tokens=max_new_tokens
-                )
-                
+            response = client.completion_with_backoff(
+                model=client.model, messages=prompt, max_tokens=max_new_tokens
+            )
+
             try:
-                claims_text = response['choices'][0]['message']['content']
+                claims_text = response.choices[0].message.content
                 subclaims_list = re.split('Claim [0-9]+: ', claims_text.replace('\n',''))[1:]
                         
                 print(item['example_id'], text_key)
