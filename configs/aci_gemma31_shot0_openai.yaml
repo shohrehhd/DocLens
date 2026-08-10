@@ -1,6 +1,8 @@
 ---
 prompt_file: prompts/acibench_annotated-citation_dummy.json
 provider: openai
-model: gpt-35-turbo
 shot: 1
 quick_test: 3
+model: google/gemma-4-31B-it
+model_host: 10.14.29.35:11435
+

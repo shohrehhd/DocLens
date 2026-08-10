@@ -75,7 +75,7 @@ def main():
         print("Change the max length to 4096 for ChatGPT.")
         max_length = 4096
     else:
-        max_length = 2048
+        max_length = 8092
                 
     # API setup
     if args.provider == "snowflake":

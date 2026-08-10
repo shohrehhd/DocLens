@@ -1,6 +1,6 @@
 ---
 prompt_file: prompts/mimic_annotated-citation.json
 provider: openai
-model: gpt-4
+model: google/gemma-4-31B-it
+model_host: 10.14.29.35:11435
 shot: 12
-quick_test: 3
