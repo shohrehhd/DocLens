@@ -8,12 +8,20 @@ import numpy as np
 import re
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from client_utils import AzureOpenAIClient, OpenAICompatibleClient
+from client_utils import AzureOpenAIClient, OpenAICompatibleClient, SnowflakeCompatibleClient
 
 MIN_CLAIM = 1
 MAX_CLAIM = 30
 
 SECTION_DIVISIONS = ['subjective', 'objective_exam', 'objective_results', 'assessment_and_plan']
+
+DEFAULT_MODEL = {"azure": "gpt-4-1106-preview", "openai": "gpt-4-1106-preview", "snowflake": "openai-gpt-4.1"}
+
+
+def flatten_prompt(prompt):
+    """Flatten a list of {role, content} chat messages into a single prompt string
+    (needed for backends like Snowflake Cortex that don't take a messages array)."""
+    return "\n\n".join(f"{turn['role'].upper()}: {turn['content']}" for turn in prompt)
 
 
 if __name__ == "__main__" :
@@ -30,19 +38,27 @@ if __name__ == "__main__" :
     # claim generation model
     parser.add_argument('--prompt_file', required=True, help='filename of the prompt dict .json.')
     parser.add_argument("--azure", action="store_true", default=False, help="Azure openai API")
+    parser.add_argument("--provider", type=str, default="openai", choices=["openai", "snowflake"],
+                         help="Backend to send completions to (ignored if --azure is set)")
     parser.add_argument("--model_host", type=str, default=None, help="Host of the OpenAI-compatible endpoint (e.g. vLLM server)")
+    parser.add_argument("--model", type=str, default=None, help="Model/deployment name to use (defaults depend on provider)")
     parser.add_argument("--max_new_tokens", type=int, default=2000, help="Max number of new tokens to generate in one step")
 
     args = parser.parse_args()
 
     eval_file, result_file, mode, prompt_file, max_new_tokens = args.eval_file, args.result_file, args.mode, args.prompt_file, args.max_new_tokens
 
+    is_snowflake = not args.azure and args.provider == "snowflake"
+
     if args.azure:
-        CLAIM_EXTRACTOR_NAME = CLAIM_EXTRACTOR_DEPLOY_NAME = "gpt-4-1106-preview"
+        CLAIM_EXTRACTOR_NAME = CLAIM_EXTRACTOR_DEPLOY_NAME = args.model or DEFAULT_MODEL["azure"]
         # CLAIM_EXTRACTOR_NAME = CLAIM_EXTRACTOR_DEPLOY_NAME = "gpt-35-turbo"
         client = AzureOpenAIClient(model=CLAIM_EXTRACTOR_NAME, deploy_name=CLAIM_EXTRACTOR_DEPLOY_NAME)
+    elif is_snowflake:
+        CLAIM_EXTRACTOR_NAME = args.model or DEFAULT_MODEL["snowflake"]
+        client = SnowflakeCompatibleClient(model=CLAIM_EXTRACTOR_NAME)
     else:
-        CLAIM_EXTRACTOR_NAME = "gpt-4-1106-preview"
+        CLAIM_EXTRACTOR_NAME = args.model or DEFAULT_MODEL["openai"]
         client = OpenAICompatibleClient(model=CLAIM_EXTRACTOR_NAME, model_host=args.model_host)
     
     if mode == 'reference_claims':
@@ -104,12 +120,13 @@ if __name__ == "__main__" :
                 item[claim_key] = []
                 continue
             
-            response = client.completion_with_backoff(
-                model=client.model, messages=prompt, max_tokens=max_new_tokens
-            )
+            if is_snowflake:
+                response = client.completion_with_backoff(prompt=flatten_prompt(prompt), max_tokens=max_new_tokens)
+            else:
+                response = client.completion_with_backoff(model=client.model, messages=prompt, max_tokens=max_new_tokens)
 
             try:
-                claims_text = response.choices[0].message.content
+                claims_text = response if is_snowflake else response.choices[0].message.content
                 subclaims_list = re.split('Claim [0-9]+: ', claims_text.replace('\n',''))[1:]
                         
                 print(item['example_id'], text_key)

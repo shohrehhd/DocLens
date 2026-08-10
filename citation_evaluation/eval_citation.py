@@ -8,15 +8,22 @@ import numpy as np
 import re
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from client_utils import AzureOpenAIClient, OpenAICompatibleClient
+from client_utils import AzureOpenAIClient, OpenAICompatibleClient, SnowflakeCompatibleClient
 
 from nltk import sent_tokenize
 
 
 SECTION_DIVISIONS = ['subjective', 'objective_exam', 'objective_results', 'assessment_and_plan']
 
+DEFAULT_MODEL = {"azure": "gpt-4-1106-preview", "openai": "gpt-4-1106-preview", "snowflake": "openai-gpt-4.1"}
+
 def remove_citations(sent):
     return re.sub(r"\[\d+", "", re.sub(r" \[\d+", "", sent)).replace(" |", "").replace("]", "")
+
+def flatten_prompt(prompt):
+    """Flatten a list of {role, content} chat messages into a single prompt string
+    (needed for backends like Snowflake Cortex that don't take a messages array)."""
+    return "\n\n".join(f"{turn['role'].upper()}: {turn['content']}" for turn in prompt)
 
 
 if __name__ == "__main__":
@@ -33,7 +40,10 @@ if __name__ == "__main__":
     # evaluation model
     parser.add_argument('--prompt_file', required=True, help='filename of the prompt dict .json.')
     parser.add_argument("--azure", action="store_true", default=False, help="Azure openai API")
+    parser.add_argument("--provider", type=str, default="openai", choices=["openai", "snowflake"],
+                         help="Backend to send completions to (ignored if --azure is set)")
     parser.add_argument("--model_host", type=str, default=None, help="Host of the OpenAI-compatible endpoint (e.g. vLLM server)")
+    parser.add_argument("--model", type=str, default=None, help="Model/deployment name to use (defaults depend on provider)")
     parser.add_argument("--max_new_tokens", type=int, default=2000, help="Max number of new tokens to generate in one step")
 
     args = parser.parse_args()
@@ -41,13 +51,18 @@ if __name__ == "__main__":
     result_file, dataset_name, split_method, max_citation_num, prompt_file, max_new_tokens = args.result_file, args.dataset_name, args.split_method, args.max_citation_num, args.prompt_file, args.max_new_tokens
     savefile = result_file.replace('.json', '.citations.score')
 
+    is_snowflake = not args.azure and args.provider == "snowflake"
+
     # API setup
     if args.azure:
-        EVALUATOR_NAME = EVALUATOR_DEPLOY_NAME = "gpt-4-1106-preview"
+        EVALUATOR_NAME = EVALUATOR_DEPLOY_NAME = args.model or DEFAULT_MODEL["azure"]
         # EVALUATOR_NAME = EVALUATOR_DEPLOY_NAME = "gpt-35-turbo"
         client = AzureOpenAIClient(model=EVALUATOR_NAME, deploy_name=EVALUATOR_DEPLOY_NAME)
+    elif is_snowflake:
+        EVALUATOR_NAME = args.model or DEFAULT_MODEL["snowflake"]
+        client = SnowflakeCompatibleClient(model=EVALUATOR_NAME)
     else:
-        EVALUATOR_NAME = "gpt-4-1106-preview"
+        EVALUATOR_NAME = args.model or DEFAULT_MODEL["openai"]
         client = OpenAICompatibleClient(model=EVALUATOR_NAME, model_host=args.model_host)
     
     if not args.get_persection_score:
@@ -215,9 +230,10 @@ if __name__ == "__main__":
                     cited_input_name: joint_passage
                 })
                 
-                response = client.completion_with_backoff(
-                    model=client.model, messages=prompt, max_tokens=max_new_tokens
-                )
+                if is_snowflake:
+                    response = client.completion_with_backoff(prompt=flatten_prompt(prompt), max_tokens=max_new_tokens)
+                else:
+                    response = client.completion_with_backoff(model=client.model, messages=prompt, max_tokens=max_new_tokens)
 
                 if isinstance(response, dict) and len(response) == 0:
                     citations_score[section][eid_str][sent_id] = {
@@ -232,7 +248,7 @@ if __name__ == "__main__":
 
                     continue
                 else:
-                    response_content = response.choices[0].message.content
+                    response_content = response if is_snowflake else response.choices[0].message.content
                 
                 try:
                     response_dict = json.loads(response_content) # entailment_prediction, explanation, provenance
