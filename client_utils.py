@@ -10,6 +10,35 @@ from abc import ABC, abstractmethod
 import re
 
 
+SNOWFLAKE_CONFIG_FILE = pathlib.Path(os.environ.get(
+    "SNOWFLAKE_CONFIG_FILE", pathlib.Path(__file__).parent / "snowflake_config.json"
+))
+
+
+def _load_snowflake_params() -> dict:
+    """Load Snowflake connection settings from a local, gitignored config file
+    (see snowflake_config.example.json for the expected format)."""
+    if not SNOWFLAKE_CONFIG_FILE.exists():
+        raise FileNotFoundError(
+            f"Snowflake config file not found at {SNOWFLAKE_CONFIG_FILE}. "
+            "Copy snowflake_config.example.json to snowflake_config.json and fill in your account details."
+        )
+    with open(SNOWFLAKE_CONFIG_FILE) as f:
+        cfg = json.load(f)
+
+    return {
+        "account": cfg["account"],
+        "user": cfg["user"],
+        "authenticator": "SNOWFLAKE_JWT",
+        "private_key_file": pathlib.Path(cfg.get("private_key_file", "~/.snowflake/snowflake_key.p8")).expanduser(),
+        "private_key_file_pwd": (
+            os.getenv("Pass") or getpass.getpass(prompt="Passphrase to unlock Snowflake private key: ")
+        ),
+        "database": cfg["database"],
+        "schema": cfg["schema"],
+        "warehouse": cfg["warehouse"],
+        "role": cfg["role"],
+    }
 
 
 
@@ -221,19 +250,7 @@ class AzureOpenAIClient(LLMClient):
 class SnowflakeCompatibleClient(LLMClient):
     def __init__(self, model):
         import snowflake.connector
-        params = {
-        "account": "moffitt.us-east-1.privatelink",
-        "user": "shohreh.haddadan@moffitt.org",
-        "authenticator": "SNOWFLAKE_JWT",
-        "private_key_file": pathlib.Path("~/.snowflake/snowflake_key.p8").expanduser(),
-        "private_key_file_pwd": (
-            os.getenv("Pass") or getpass.getpass(prompt="Passphrase to unlock Snowflake private key: ")
-        ),
-        "database": "MCAP_CDSC_PROD",
-        "schema": "MCC23352_THIEU_THANH",
-        "warehouse": "SNOWFLAKE_HB_WH",
-        "role": "SNOWFLAKE_MCC23352",
-        }
+        params = _load_snowflake_params()
         self.snowflake_session = Session.builder.configs(params).create()
         self.model = model
         #self._client = snowflake.connector.connect(**client_kwargs)
@@ -336,19 +353,7 @@ class SnowflakeCompatibleClient(LLMClient):
 
 class snowflake_client():
     def __init__(self):
-        params = {
-        "account": "moffitt.us-east-1.privatelink",
-        "user": "shohreh.haddadan@moffitt.org",
-        "authenticator": "SNOWFLAKE_JWT",
-        "private_key_file": pathlib.Path("~/.snowflake/snowflake_key.p8").expanduser(),
-        "private_key_file_pwd": (
-            os.getenv("Pass") or getpass.getpass(prompt="Passphrase to unlock Snowflake private key: ")
-        ),
-        "database": "MCAP_CDSC_PROD",
-        "schema": "MCC23352_THIEU_THANH",
-        "warehouse": "SNOWFLAKE_HB_WH",
-        "role": "SNOWFLAKE_MCC23352",
-        }
+        params = _load_snowflake_params()
         self.snowflake_session = Session.builder.configs(params).create()
     
 

@@ -5,3 +5,6 @@ __pycache__/
 
 # data
 results/*
+
+# secrets
+snowflake_config.json
