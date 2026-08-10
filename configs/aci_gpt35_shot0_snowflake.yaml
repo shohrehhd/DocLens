@@ -1,0 +1,6 @@
+---
+prompt_file: prompts/acibench_annotated-citation_dummy.json
+provider: snowflake
+model: openai-gpt-4.1
+shot: 1
+quick_test: 3
