@@ -124,6 +124,7 @@ class SectionTagger() :
             prevsectionheadertuple = ( NOSECTIONHEADER, 0, 0, 0 )
 
         lines = text.split( '\n' )
+        print(lines)
         offset = len( lines[0] ) + 1
         for linenum, line in enumerate( lines[1:], 1 ) :
 
@@ -152,6 +153,7 @@ class SectionTagger() :
     def divide_note_by_metasections( self, text ) :
 
         detected_sections = self.tag_sections( text )
+        
 
         #if starts with no sectionheader, we shall just assign as subjective
         if ( len( detected_sections ) > 0 ) and detected_sections[0][0] == NOSECTIONHEADER :
@@ -180,7 +182,6 @@ class SectionTagger() :
 
         if len( meta_sections ) > 0 :
             meta_sections[ -1 ][-1] = len( text )
-
         return meta_sections
 
 
@@ -196,6 +197,7 @@ if __name__ == "__main__" :
 
     section_tagger = SectionTagger()
     secttups = section_tagger.tag_sections( text )
+    print(secttups)
 
     ent_id = 0
     

@@ -44,7 +44,7 @@ def get_citation_scores(citation_scores):
                 sent_count += 1
                 citation_count += len(sent_pred_dict['citations'])
                 
-                if sent_pred_dict['entailment_prediction'] == 1:
+                if sent_pred_dict.get('entailment_prediction',0) == 1:
                     correct_sent_count += 1
                     correct_citation_count += len([x for x in sent_pred_dict['citations'] if x in sent_pred_dict['provenance']])
                     

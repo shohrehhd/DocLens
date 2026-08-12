@@ -11,6 +11,23 @@ from transformers import GPT2TokenizerFast
 from client_utils import OpenAICompatibleClient, AzureOpenAIClient, SnowflakeCompatibleClient
 
 
+def unwrap_json_string_output(text):
+    """Some models occasionally wrap their entire response in an extra layer of
+    JSON string escaping (e.g. `"HISTORY OF...\\nPHYSICAL EXAM..."` instead of a
+    plain string with real newlines). That breaks downstream line-based section
+    tagging, since everything collapses onto a single "line". If the text is
+    exactly a JSON-encoded string, unwrap it back to plain text."""
+    stripped = text.strip()
+    if len(stripped) >= 2 and stripped[0] == '"' and stripped[-1] == '"':
+        try:
+            unwrapped = json.loads(stripped)
+        except json.JSONDecodeError:
+            return text
+        if isinstance(unwrapped, str):
+            return unwrapped
+    return text
+
+
 def flatten_prompt(prompt):
     """Flatten a list of {role, content} chat messages into a single prompt string
     (needed for backends like Snowflake Cortex that don't take a messages array)."""
@@ -156,7 +173,7 @@ def main():
             output = response if args.provider == "snowflake" else response.choices[0].message.content
             if not isinstance(output, str):
                 raise ValueError("empty response")
-            item['output'] = output
+            item['output'] = unwrap_json_string_output(output)
             new_generation_count += 1
         except Exception:
             print(f"Generation Error for sample: {idx}")

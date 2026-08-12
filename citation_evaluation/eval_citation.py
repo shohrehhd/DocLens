@@ -232,8 +232,13 @@ if __name__ == "__main__":
                 
                 if is_snowflake:
                     response = client.completion_with_backoff(prompt=flatten_prompt(prompt), max_tokens=max_new_tokens)
+                    text = response
                 else:
                     response = client.completion_with_backoff(model=client.model, messages=prompt, max_tokens=max_new_tokens)
+                    text = response.choices[0].message.content
+
+                text = re.sub(r"^```(json)?|```$", "", text.strip(), flags=re.MULTILINE).strip()
+                response = text
 
                 if isinstance(response, dict) and len(response) == 0:
                     citations_score[section][eid_str][sent_id] = {
@@ -248,12 +253,13 @@ if __name__ == "__main__":
 
                     continue
                 else:
-                    response_content = response if is_snowflake else response.choices[0].message.content
+                    response_content = response 
                 
                 try:
                     response_dict = json.loads(response_content) # entailment_prediction, explanation, provenance
                     print(json.dumps(response_dict, indent=4))
-                    
+                    if(isinstance(response_dict,str)):
+                        response_dict = json.loads(response_dict)
                     response_dict.update({
                         "sent_id": sent_id,
                         "output": sent,
@@ -265,9 +271,9 @@ if __name__ == "__main__":
                     })
                     
                     citations_score[section][eid_str][sent_id] = response_dict
-                except:
+                except Exception as ex:
                     wrong_entailment_count += 1
-                    print('!'*10, 'Cannot convert to json format', '!'*10)
+                    print('!'*10, 'Cannot convert to json format', '!'*10,ex)
                     print(response_content)
                     citations_score[section][eid_str][sent_id] = {
                         "sent_id": sent_id,

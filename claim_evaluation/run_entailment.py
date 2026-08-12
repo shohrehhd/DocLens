@@ -76,7 +76,6 @@ if __name__ == "__main__":
         
     if not args.use_persection_claims:
         SECTION_DIVISIONS = ['full']
-    
     output_data = json.load(open(result_file, 'r')) # a list of dicts
     
     print( f"Saving scores to {savefile.split('/')[-1]}..") # {section: {eid_str: [{"claim": "", "entailment_prediction": 0 or 1}, ...]} }
@@ -174,13 +173,27 @@ if __name__ == "__main__":
                     
             if is_snowflake:
                 response = client.completion_with_backoff(prompt=flatten_prompt(prompt), max_tokens=max_new_tokens)
+                text= response
+
+
             else:
                 response = client.completion_with_backoff(model=client.model, messages=prompt, max_tokens=max_new_tokens)
-
-            new_generation_count += 1
-
+                text = response.choices[0].message.content
+            
+            text = re.sub(r"^```(json)?|```$", "", text.strip(), flags=re.MULTILINE).strip()
             try:
-                judgment_dict = json.loads(response if is_snowflake else response.choices[0].message.content)
+                response = json.loads(text)
+            except json.JSONDecodeError:
+                response = text
+                
+            new_generation_count += 1
+            
+            try:
+                if(isinstance(response,str)):
+                    judgment_dict = json.loads(response)
+                else:
+                    judgment_dict = response
+                    
                 if dataset_name == 'meqsum':
                     judgment_dict['entailment_prediction'] = judgment_dict['prediction']
                     claims_score[section][eid_str] = [judgment_dict]
@@ -193,12 +206,12 @@ if __name__ == "__main__":
                         print(f"{d['entailment_prediction']} Claim {cid}: {d['claim']}")
             except:
                 print('CANNOT CONVERT TO JSON')
-                print(response)
+                
                 wrong_format_count += 1
             
             if new_generation_count % 5 == 0:
                 # save every 5 steps
-                print('Saving results..')
+                print(f'Saving results in {savefile}')
                 json.dump(claims_score, open(savefile, 'w'), indent=4, sort_keys=True)
         
     json.dump(claims_score, open(savefile, 'w'), indent=4, sort_keys=True)

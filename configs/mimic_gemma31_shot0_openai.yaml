@@ -2,5 +2,5 @@
 prompt_file: prompts/mimic_annotated-citation_dummy.json
 provider: openai
 model: google/gemma-4-31B-it
-model_host: 10.14.29.35:11435
+model_host: 10.14.29.33:11435
 shot: 1

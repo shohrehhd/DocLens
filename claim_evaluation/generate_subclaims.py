@@ -26,6 +26,7 @@ def flatten_prompt(prompt):
 
 if __name__ == "__main__" :
     parser = argparse.ArgumentParser()
+
     # data
     parser.add_argument('--eval_file', default=None, help='filename of the eval_data .json.')
     parser.add_argument('--result_file', required=True, help='filename of the system-generated outputs.')
@@ -45,7 +46,6 @@ if __name__ == "__main__" :
     parser.add_argument("--max_new_tokens", type=int, default=2000, help="Max number of new tokens to generate in one step")
 
     args = parser.parse_args()
-
     eval_file, result_file, mode, prompt_file, max_new_tokens = args.eval_file, args.result_file, args.mode, args.prompt_file, args.max_new_tokens
 
     is_snowflake = not args.azure and args.provider == "snowflake"
@@ -90,12 +90,10 @@ if __name__ == "__main__" :
             text_keys = ['output']
             claim_keys = ['subclaims_output']
             prompt_template_dict = {'output': json.load(open(prompt_file))}
-            
     data = json.load(open(input_data_file))
             
     for k in prompt_template_dict:
         prompt_template_dict[k][0]['content'] = prompt_template_dict[k][0]['content'].replace('MIN_CLAIM', str(MIN_CLAIM)).replace('MAX_CLAIM', str(MAX_CLAIM))
-        
     if mode == 'reference_claims':
         # copy results from data to result_file 
         result_data = json.load(open(result_file))
@@ -127,6 +125,7 @@ if __name__ == "__main__" :
 
             try:
                 claims_text = response if is_snowflake else response.choices[0].message.content
+                claims_text = re.sub(r"^```(json)?|```$", "", claims_text.strip(), flags=re.MULTILINE).strip()
                 subclaims_list = re.split('Claim [0-9]+: ', claims_text.replace('\n',''))[1:]
                         
                 print(item['example_id'], text_key)

@@ -25,6 +25,7 @@ if __name__ == "__main__":
         
         # combine output
         for item_id, item in enumerate(data):
+            print(item_id)
             output = ""
             for section_data, section in zip(data_list, SECTION_DIVISIONS):
                 section_test_key = '%s_%s' % ('output', section)
