@@ -86,6 +86,9 @@ if __name__ == "__main__":
     parser.add_argument("--eval_claim_recall", action="store_true", default=False, help="Compute claim recall")
     parser.add_argument("--eval_claim_precision", action="store_true", default=False, help="Compute claim precision")
     parser.add_argument("--eval_citations", action="store_true", default=False, help="Compute citation recall & precision")
+    parser.add_argument("--eval_claim_recall_input", action="store_true", default=False, help="Compute claim recall against input claims (output entails input_claims)")
+    parser.add_argument("--eval_claim_groundedness", action="store_true", default=False, help="Compute output claim groundedness (input entails output_claims)")
+    parser.add_argument("--eval_reference_groundedness", action="store_true", default=False, help="Compute reference claim groundedness (input entails reference_claims)")
     
     # evaluation model
     parser.add_argument("--eval_model", type=str, choices=['TRUE', 'Mistral', 'GPT'])

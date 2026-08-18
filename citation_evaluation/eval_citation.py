@@ -50,7 +50,6 @@ if __name__ == "__main__":
 
     result_file, dataset_name, split_method, max_citation_num, prompt_file, max_new_tokens = args.result_file, args.dataset_name, args.split_method, args.max_citation_num, args.prompt_file, args.max_new_tokens
     savefile = result_file.replace('.json', '.citations.score')
-
     is_snowflake = not args.azure and args.provider == "snowflake"
 
     # API setup
@@ -112,6 +111,7 @@ if __name__ == "__main__":
         
         for item in output_data:
             eid_str, input_text, output_text = str(item['example_id']), item['input'], item[output_key]
+            
                 
             if output_text == "":
                 # skip empty note
@@ -146,17 +146,32 @@ if __name__ == "__main__":
                     
             sents = [" ".join(s.split()) for s in sents] # output sents w/ citations
             target_sents = [remove_citations(sent) for sent in sents]
+
+
+            if(dataset_name=="tb"):
             
-            # split input text by citations
-            input_sents = re.split("\[\d+\]", input_text)[1:] # the sent is after its citation idx
-            citations = re.findall("\[\d+\]", input_text)
-            input_sents = [" ".join(s.split()) for s in input_sents]
-            docs = {int(citation[1:-1]): sent for sent, citation in zip(input_sents, citations)}
-            
+                marker = re.compile(r"\[(\d+)\]\[([^\]]*)\]\[([^\]]*)\]")
+                matches = list(marker.finditer(input_text))
+                
+                docs = {}
+                for m, nxt in zip(matches, matches[1:] + [None]):
+                    end = nxt.start() if nxt else len(input_text)
+                    docs[int(m.group(1))] = " ".join(input_text[m.end():end].replace("\\n", " ").split())
+                    '''docs[int(m.group(1))] = {
+                        "role": m.group(2),
+                        "label": m.group(3),
+                        "text": " ".join(input_text[m.end():end].split()),
+                    }'''
+            else:
+                # split input text by citations
+                input_sents = re.split("\[\d+\]", input_text)[1:] # the sent is after its citation idx
+                citations = re.findall("\[\d+\]", input_text)
+                input_sents = [" ".join(s.split()) for s in input_sents]
+                docs = {int(citation[1:-1]): sent for sent, citation in zip(input_sents, citations)}
             # run entailment
             sent_count += len(sents)
             new_gen_flag = False
-
+            
             if len(citations_score[section][eid_str]) < len(sents):
                 citations_score[section][eid_str] = [{} for _ in sents]
                 
@@ -169,8 +184,13 @@ if __name__ == "__main__":
                 target_sent = target_sents[sent_id] # The output sent
 
                 # Find references
+                print(sent,target_sent)
+                
                 ref = [int(r[1:]) for r in re.findall(r"\[\d+", sent)] # In our setting the citation starts from 0
+                
                 ref = list(set(ref)) # there could be repeated ref
+                print("Ref:",ref)
+                input("enter")
                 print('-'*20, f'eid_str: {eid_str}, Sentence idx: {sent_id}', '-'*20)
                 print(f"For `{sent}`, find citations {ref}")
                 
@@ -213,6 +233,16 @@ if __name__ == "__main__":
                             "idx": str(psgs_id),
                             "speaker": speaker,
                             "content": content
+                        })
+                elif dataset_name == 'tb':
+                    joint_passage = []
+                    for psgs_id in ref:
+                        d = docs[psgs_id]
+                        joint_passage.append({
+                            "idx": str(psgs_id),
+                            "role": d["role"],
+                            "label": d["label"],
+                            "content": d["text"],
                         })
                 else:
                     joint_passage = []

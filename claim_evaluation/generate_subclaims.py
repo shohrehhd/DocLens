@@ -32,8 +32,8 @@ if __name__ == "__main__" :
     parser.add_argument('--result_file', required=True, help='filename of the system-generated outputs.')
     
     # claim generation setting
-    parser.add_argument('--mode', type=str, default='reference_claims', choices=['reference_claims', 'output_claims'],
-                        help='whether to generate claims for the references or outputs')
+    parser.add_argument('--mode', type=str, default='reference_claims', choices=['reference_claims', 'output_claims', 'input_claims'],
+                        help='whether to generate claims for the references, outputs, or inputs')
     parser.add_argument("--use_persection_claims", action="store_true", default=False, help="Generate claims for each section")
     
     # claim generation model
@@ -78,7 +78,7 @@ if __name__ == "__main__" :
             claim_keys = ['subclaims_reference']
             prompt_template_dict = {'reference': json.load(open(prompt_file))}
     
-    else:
+    elif mode=="output_claims":
         claim_file = result_file.replace('.json', f'.output_claim_min{MIN_CLAIM}max{MAX_CLAIM}.json')
         input_data_file = claim_file if os.path.exists(claim_file) else result_file
         
@@ -90,6 +90,14 @@ if __name__ == "__main__" :
             text_keys = ['output']
             claim_keys = ['subclaims_output']
             prompt_template_dict = {'output': json.load(open(prompt_file))}
+
+    elif mode == "input_claims":
+        claim_file = result_file.replace('.json', f'.input_claim_min{MIN_CLAIM}max{MAX_CLAIM}.json')
+        input_data_file = claim_file if os.path.exists(claim_file) else result_file
+
+        text_keys = ['input']
+        claim_keys = ['subclaims_input']
+        prompt_template_dict = {'input': json.load(open(prompt_file))}
     data = json.load(open(input_data_file))
             
     for k in prompt_template_dict:

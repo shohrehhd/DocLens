@@ -32,7 +32,8 @@ if __name__ == "__main__":
     parser.add_argument("--dataset_name", type=str, default=None, help="Name of the dataset")
     
     # evaluation setting
-    parser.add_argument("--mode", type=str, default="claim_recall", choices=['claim_recall','claim_precision','same'])
+    parser.add_argument("--mode", type=str, default="claim_recall",
+                         choices=['claim_recall', 'claim_precision', 'same', 'claim_recall_input', 'claim_groundedness', 'reference_groundedness'])
     parser.add_argument("--use_persection_claims", action="store_true", default=False, help="Generate claims for each section")
     
     # evaluation model
@@ -73,7 +74,16 @@ if __name__ == "__main__":
         # (3) whether the two questions are essentially the same
         assert dataset_name == 'meqsum'
         savefile = result_file.replace('.json', '.same_scores')
-        
+    elif mode == 'claim_recall_input':
+        # whether the output covers the claims extracted from the raw input
+        savefile = result_file.replace('.json', '.claim_recall_input_scores')
+    elif mode == 'claim_groundedness':
+        # whether the output's claims are grounded in the raw input
+        savefile = result_file.replace('.json', '.claim_groundedness_scores')
+    elif mode == 'reference_groundedness':
+        # whether the reference's claims are grounded in the raw input
+        savefile = result_file.replace('.json', '.reference_groundedness_scores')
+
     if not args.use_persection_claims:
         SECTION_DIVISIONS = ['full']
     output_data = json.load(open(result_file, 'r')) # a list of dicts
@@ -131,7 +141,19 @@ if __name__ == "__main__":
         elif args.mode == 'same':
             text_key = 'output'
             subclaim_key = 'reference'
-            
+
+        elif args.mode == 'claim_recall_input':
+            text_key = 'output'
+            subclaim_key = 'subclaims_input'
+
+        elif args.mode == 'claim_groundedness':
+            text_key = 'input'
+            subclaim_key = 'subclaims_output'
+
+        elif args.mode == 'reference_groundedness':
+            text_key = 'input'
+            subclaim_key = 'subclaims_reference'
+
         text_name = TEXT_NAME[dataset_name] if dataset_name in TEXT_NAME else "clinical_report"
         
         for item in output_data:
