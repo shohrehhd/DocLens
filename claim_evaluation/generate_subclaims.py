@@ -24,6 +24,26 @@ def flatten_prompt(prompt):
     return "\n\n".join(f"{turn['role'].upper()}: {turn['content']}" for turn in prompt)
 
 
+CITATION_RE = re.compile(r"\[(\d+)\]")
+
+
+def strip_citations(claim):
+    return CITATION_RE.sub("", claim).strip()
+
+
+def build_claim_metadata(claim, line_metadata_by_index):
+    """Attribute a claim to the utterance(s) it cites, inheriting each cited
+    utterance's speaker/label/speaker_role (see data_processing/convert_transcripts.py)."""
+    cited_indices = [int(idx) for idx in CITATION_RE.findall(claim)]
+    cited_lines = [line_metadata_by_index[idx] for idx in cited_indices if idx in line_metadata_by_index]
+    return {
+        "citations": cited_indices,
+        "speakers": [line["speaker"] for line in cited_lines],
+        "speaker_roles": [line["speaker_role"] for line in cited_lines if line["speaker_role"]],
+        "labels": [line["label"] for line in cited_lines if line["label"]],
+    }
+
+
 if __name__ == "__main__" :
     parser = argparse.ArgumentParser()
 
@@ -92,7 +112,7 @@ if __name__ == "__main__" :
             prompt_template_dict = {'output': json.load(open(prompt_file))}
 
     elif mode == "input_claims":
-        claim_file = result_file.replace('.json', f'.input_claim_min{MIN_CLAIM}max{MAX_CLAIM}.json')
+        claim_file = result_file.replace('.json', '.input_claim_unbounded.json')
         input_data_file = claim_file if os.path.exists(claim_file) else result_file
 
         text_keys = ['input']
@@ -101,7 +121,25 @@ if __name__ == "__main__" :
     data = json.load(open(input_data_file))
             
     for k in prompt_template_dict:
-        prompt_template_dict[k][0]['content'] = prompt_template_dict[k][0]['content'].replace('MIN_CLAIM', str(MIN_CLAIM)).replace('MAX_CLAIM', str(MAX_CLAIM))
+        content = prompt_template_dict[k][0]['content']
+        if mode == 'input_claims':
+            # Claims extracted from the input should not be capped at MAX_CLAIM: the
+            # input transcript can be much longer than a reference/output note, so an
+            # artificial ceiling would silently drop facts instead of covering them all.
+            content = content.replace('at least __MIN_CLAIM__ at most __MAX_CLAIM__ short claims', 'all the short claims')
+            # The transcript is given as utterances marked "[i][Label][Role/Speaker] ...".
+            # Asking for a citation back to that index lets us attribute each claim to the
+            # speaker/label/speaker_role of the utterance(s) it came from (see
+            # build_claim_metadata below).
+            content += (
+                " Each claim must end with a citation to the utterance number(s) it is based on, "
+                "matching the [i] marker already at the start of that utterance in the transcript, "
+                "e.g. \"Claim 1: The patient has a history of nephrectomy. [3]\". "
+                "If a claim draws on more than one utterance, cite all of them, e.g. \"[3][4]\"."
+            )
+        else:
+            content = content.replace('MIN_CLAIM', str(MIN_CLAIM)).replace('MAX_CLAIM', str(MAX_CLAIM))
+        prompt_template_dict[k][0]['content'] = content
     if mode == 'reference_claims':
         # copy results from data to result_file 
         result_data = json.load(open(result_file))
@@ -141,7 +179,18 @@ if __name__ == "__main__" :
                 for claim in subclaims_list:
                     print(claim)
                 print('='*50)
-                item[claim_key] = subclaims_list
+
+                if mode == 'input_claims':
+                    # Attribute each claim to the utterance(s) it cites, so it inherits
+                    # that utterance's speaker/label/speaker_role rather than being an
+                    # anonymous fact untied to who said it.
+                    line_metadata_by_index = {line['index']: line for line in item.get('input_line_metadata', [])}
+                    item[claim_key] = [strip_citations(claim) for claim in subclaims_list]
+                    item[f'{claim_key}_metadata'] = [
+                        build_claim_metadata(claim, line_metadata_by_index) for claim in subclaims_list
+                    ]
+                else:
+                    item[claim_key] = subclaims_list
             
             except:
                 print(f"Wrong format for {item['example_id']}-{text_key}")

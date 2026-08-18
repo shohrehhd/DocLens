@@ -33,7 +33,7 @@ if __name__ == "__main__":
     
     # evaluation setting
     parser.add_argument("--mode", type=str, default="claim_recall",
-                         choices=['claim_recall', 'claim_precision', 'same', 'claim_recall_input', 'claim_groundedness', 'reference_groundedness'])
+                         choices=['claim_recall', 'claim_precision', 'same', 'claim_recall_input', 'reference_recall_input', 'claim_groundedness', 'reference_groundedness'])
     parser.add_argument("--use_persection_claims", action="store_true", default=False, help="Generate claims for each section")
     
     # evaluation model
@@ -77,6 +77,9 @@ if __name__ == "__main__":
     elif mode == 'claim_recall_input':
         # whether the output covers the claims extracted from the raw input
         savefile = result_file.replace('.json', '.claim_recall_input_scores')
+    elif mode == 'reference_recall_input':
+        # whether the reference covers the claims extracted from the raw input
+        savefile = result_file.replace('.json', '.reference_recall_input_scores')
     elif mode == 'claim_groundedness':
         # whether the output's claims are grounded in the raw input
         savefile = result_file.replace('.json', '.claim_groundedness_scores')
@@ -144,6 +147,10 @@ if __name__ == "__main__":
 
         elif args.mode == 'claim_recall_input':
             text_key = 'output'
+            subclaim_key = 'subclaims_input'
+
+        elif args.mode == 'reference_recall_input':
+            text_key = 'reference'
             subclaim_key = 'subclaims_input'
 
         elif args.mode == 'claim_groundedness':
