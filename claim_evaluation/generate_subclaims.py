@@ -122,23 +122,7 @@ if __name__ == "__main__" :
             
     for k in prompt_template_dict:
         content = prompt_template_dict[k][0]['content']
-        if mode == 'input_claims':
-            # Claims extracted from the input should not be capped at MAX_CLAIM: the
-            # input transcript can be much longer than a reference/output note, so an
-            # artificial ceiling would silently drop facts instead of covering them all.
-            content = content.replace('at least __MIN_CLAIM__ at most __MAX_CLAIM__ short claims', 'all the short claims')
-            # The transcript is given as utterances marked "[i][Label][Role/Speaker] ...".
-            # Asking for a citation back to that index lets us attribute each claim to the
-            # speaker/label/speaker_role of the utterance(s) it came from (see
-            # build_claim_metadata below).
-            content += (
-                " Each claim must end with a citation to the utterance number(s) it is based on, "
-                "matching the [i] marker already at the start of that utterance in the transcript, "
-                "e.g. \"Claim 1: The patient has a history of nephrectomy. [3]\". "
-                "If a claim draws on more than one utterance, cite all of them, e.g. \"[3][4]\"."
-            )
-        else:
-            content = content.replace('MIN_CLAIM', str(MIN_CLAIM)).replace('MAX_CLAIM', str(MAX_CLAIM))
+        content = content.replace('MIN_CLAIM', str(MIN_CLAIM)).replace('MAX_CLAIM', str(MAX_CLAIM))
         prompt_template_dict[k][0]['content'] = content
     if mode == 'reference_claims':
         # copy results from data to result_file 

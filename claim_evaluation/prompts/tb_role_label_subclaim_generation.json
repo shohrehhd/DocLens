@@ -1,0 +1,36 @@
+[
+    
+    {
+        "role": "system",
+        "content": "Instruction: You are a helpful medical assistant. Read the Tumor board discussion and generate all short claims that are supported by the discussion. Each short claim should contain only one fact. The generated claims should cover all facts in the discussion. Each claim must end with a citation to the utterance number(s) it is based on, matching the [i] marker already at the start of that utterance in the transcript, If a claim draws on more than one utterance, cite all of them, e.g. \"[3][4]\"."
+    },
+    {
+        "role": "system",
+        "name": "example_user",
+        "content": "content of the tumor board discussion ..."
+    },
+    {
+        "role": "system",
+        "name": "example_assistant",
+        "content": "Claim 1: ...[1]\nClaim 2: ...[2] "
+    },
+    {
+        "role": "user",
+        "content": ""
+    },
+    {
+        "role": "system",
+        "name": "example_user",
+        "content": "[0][Irrelevant][Urologic Oncologist] Yeah.\n[1][Irrelevant][Urologic Oncologist] So this is Mr x.\n [2][Irrelevant][Urologic Oncologist] He's a 68-year-old gentleman\n [3][Presented data][Urologic Oncologist] So Mr X, he has a history of non-muscle evasive bladder cancer.\n[4][Presented data][Urologic Oncologist] He had T1 high grade and then CIS.\n[5][Presented data][Urologic Oncologist] He was treated with BCG.\n"
+    },
+    {
+        "role": "system",
+        "name": "example_assistant",
+        "content": "Claim 1: The team is dicussing the case of Mr X.[1]\n Claim 2: The patient; Mr X ;is a 68-year-old male.[2]\n Claim 3:The patient has a history of non-muscle evasive bladder cancer[3].\n  Claim 4: The patient had T1 disease.[4]\n Claim5 : The patient subsequently had carcinoma in situ (CIS)[5]. \n Claim 6 : CIS occurred after the T1 high-grade disease [5]. Claim 7 : Patient was treated with BCG [6]"
+    },
+    {
+        "role": "user",
+        "content": ""
+    }
+
+]
