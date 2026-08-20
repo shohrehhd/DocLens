@@ -33,14 +33,12 @@ def strip_citations(claim):
 
 def build_claim_metadata(claim, line_metadata_by_index):
     """Attribute a claim to the utterance(s) it cites, inheriting each cited
-    utterance's speaker/label/speaker_role (see data_processing/convert_transcripts.py)."""
+    utterance's speaker (see data_processing/convert_transcripts.py)."""
     cited_indices = [int(idx) for idx in CITATION_RE.findall(claim)]
     cited_lines = [line_metadata_by_index[idx] for idx in cited_indices if idx in line_metadata_by_index]
     return {
         "citations": cited_indices,
         "speakers": [line["speaker"] for line in cited_lines],
-        "speaker_roles": [line["speaker_role"] for line in cited_lines if line["speaker_role"]],
-        "labels": [line["label"] for line in cited_lines if line["label"]],
     }
 
 
@@ -52,8 +50,8 @@ if __name__ == "__main__" :
     parser.add_argument('--result_file', required=True, help='filename of the system-generated outputs.')
     
     # claim generation setting
-    parser.add_argument('--mode', type=str, default='reference_claims', choices=['reference_claims', 'output_claims', 'input_claims'],
-                        help='whether to generate claims for the references, outputs, or inputs')
+    parser.add_argument('--mode', type=str, default='reference_claims', choices=['reference_claims', 'output_claims', 'input_claims', 'pre_tb_claims'],
+                        help='whether to generate claims for the references, outputs, inputs, or pre-tumor-board info')
     parser.add_argument("--use_persection_claims", action="store_true", default=False, help="Generate claims for each section")
     
     # claim generation model
@@ -118,6 +116,14 @@ if __name__ == "__main__" :
         text_keys = ['input']
         claim_keys = ['subclaims_input']
         prompt_template_dict = {'input': json.load(open(prompt_file))}
+
+    elif mode == "pre_tb_claims":
+        claim_file = result_file.replace('.json', f'.pre_tb_claim_min{MIN_CLAIM}max{MAX_CLAIM}.json')
+        input_data_file = claim_file if os.path.exists(claim_file) else result_file
+
+        text_keys = ['pre_tb_input']
+        claim_keys = ['subclaims_pre_tb_input']
+        prompt_template_dict = {'pre_tb_input': json.load(open(prompt_file))}
     data = json.load(open(input_data_file))
             
     for k in prompt_template_dict:
@@ -139,7 +145,11 @@ if __name__ == "__main__" :
             if mode == 'reference_claims':
                 if item['example_id'] not in eid2result_item:
                     continue
-            
+
+            if text_key not in item:
+                # e.g. pre_tb_input is only present for some examples
+                continue
+
             text = item[text_key]
             prompt = deepcopy(prompt_template_dict[text_key])
             prompt[-1]['content'] = text 
@@ -166,8 +176,8 @@ if __name__ == "__main__" :
 
                 if mode == 'input_claims':
                     # Attribute each claim to the utterance(s) it cites, so it inherits
-                    # that utterance's speaker/label/speaker_role rather than being an
-                    # anonymous fact untied to who said it.
+                    # that utterance's speaker rather than being an anonymous fact
+                    # untied to who said it.
                     line_metadata_by_index = {line['index']: line for line in item.get('input_line_metadata', [])}
                     item[claim_key] = [strip_citations(claim) for claim in subclaims_list]
                     item[f'{claim_key}_metadata'] = [

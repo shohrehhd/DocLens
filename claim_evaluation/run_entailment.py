@@ -18,6 +18,8 @@ DEFAULT_MODEL = {"azure": "gpt-4-1106-preview", "openai": "gpt-4-1106-preview", 
 def remove_citations(sent):
     return re.sub(r"\[\d+", "", re.sub(r" \[\d+", "", sent)).replace(" |", "").replace("]", "")
 
+CITATION_RE = re.compile(r"\[(\d+)\]")
+
 def flatten_prompt(prompt):
     """Flatten a list of {role, content} chat messages into a single prompt string
     (needed for backends like Snowflake Cortex that don't take a messages array)."""
@@ -165,22 +167,33 @@ if __name__ == "__main__":
         
         for item in output_data:
             eid_str = str(item['example_id'])
-            text = remove_citations(item[text_key])
-            
+
             if dataset_name == 'meqsum':
                 claims = [item[subclaim_key]]
+                text = remove_citations(item[text_key])
             else:
                 claims = item[subclaim_key]
-                
+
                 if len(claims) == 0:
                     # skip empty claims
                     claims_score[section][eid_str] = []
                     continue
-                
+
+                if dataset_name == 'tb' and args.mode in ('claim_groundedness', 'reference_groundedness'):
+                    # Ground against the union of utterances the claims actually cite,
+                    # concatenated together, in a single entailment call -- not the
+                    # whole transcript, and not one call per utterance/claim.
+                    cited_indices = sorted({int(idx) for claim in claims for idx in CITATION_RE.findall(claim)})
+                    input_lines = item[text_key].split("\n")
+                    cited_lines = [input_lines[idx] for idx in cited_indices if idx < len(input_lines)]
+                    text = remove_citations("\n".join(cited_lines))
+                else:
+                    text = remove_citations(item[text_key])
+
                 if len(text) == 0:
                     # score is 0 for all claims
                     claims_score[section][eid_str] = [{"claim": claim, "entailment_prediction":0 } for claim in claims]
-                    continue 
+                    continue
             
             # claim style = jsonexp_2shot
             if len(claims_score[section][eid_str]) == len(claims):
