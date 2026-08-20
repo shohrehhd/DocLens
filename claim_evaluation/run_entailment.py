@@ -18,8 +18,6 @@ DEFAULT_MODEL = {"azure": "gpt-4-1106-preview", "openai": "gpt-4-1106-preview", 
 def remove_citations(sent):
     return re.sub(r"\[\d+", "", re.sub(r" \[\d+", "", sent)).replace(" |", "").replace("]", "")
 
-CITATION_RE = re.compile(r"\[(\d+)\]")
-
 def flatten_prompt(prompt):
     """Flatten a list of {role, content} chat messages into a single prompt string
     (needed for backends like Snowflake Cortex that don't take a messages array)."""
@@ -183,7 +181,10 @@ if __name__ == "__main__":
                     # Ground against the union of utterances the claims actually cite,
                     # concatenated together, in a single entailment call -- not the
                     # whole transcript, and not one call per utterance/claim.
-                    cited_indices = sorted({int(idx) for claim in claims for idx in CITATION_RE.findall(claim)})
+                    # subclaims_output/subclaims_reference carry no citations of their
+                    # own (see tb_subclaim_generation.json), so use the citations already
+                    # validated for subclaims_input instead (tb_input_subclaim_generation.json).
+                    cited_indices = sorted({idx for meta in item.get('subclaims_input_metadata', []) for idx in meta['citations']})
                     input_lines = item[text_key].split("\n")
                     cited_lines = [input_lines[idx] for idx in cited_indices if idx < len(input_lines)]
                     text = remove_citations("\n".join(cited_lines))
