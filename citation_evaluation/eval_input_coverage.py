@@ -6,11 +6,16 @@ of the raw input the claim extraction step actually drew on.
 
 import argparse
 import json
+import re
+
+# Matches the "[i][Speaker] ..." utterance markers built by
+# data_processing/convert_transcripts.py's build_input().
+UTTERANCE_RE = re.compile(r'\[(\d+)\]\[[^\]]*\]')
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--result_file', required=True,
-                         help='filename of the data with subclaims_input(_metadata) and input_line_metadata.')
+                         help='filename of the data with subclaims_input(_metadata) and input.')
     args = parser.parse_args()
 
     result_file = args.result_file
@@ -23,11 +28,11 @@ if __name__ == "__main__":
     for item in data:
         eid_str = str(item['example_id'])
 
-        if  'subclaims_input_metadata' not in item:
+        if 'input' not in item or 'subclaims_input_metadata' not in item:
             skipped += 1
             continue
 
-        valid_indices = {line['index'] for line in item['subclaims_input_metadata']}
+        valid_indices = {int(idx) for idx in UTTERANCE_RE.findall(item['input'])}
         num_utterances = len(valid_indices)
         if num_utterances == 0:
             skipped += 1
