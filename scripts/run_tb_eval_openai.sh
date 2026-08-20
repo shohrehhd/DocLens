@@ -28,6 +28,10 @@ python claim_evaluation/generate_subclaims.py --eval_file data/GU_tb_doclens.jso
     --model ${MODEL} \
     --model_host ${MODEL_HOST}
 
+# what percentage of transcript utterances were cited by at least one input claim
+python citation_evaluation/eval_input_coverage.py \
+    --result_file results/${SAVENAME}.input_claim_unbounded.json
+
 
 # claim recall
 '''

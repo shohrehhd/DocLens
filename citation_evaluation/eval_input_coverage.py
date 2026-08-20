@@ -23,17 +23,18 @@ if __name__ == "__main__":
     for item in data:
         eid_str = str(item['example_id'])
 
-        if 'input_line_metadata' not in item or 'subclaims_input_metadata' not in item:
+        if  'subclaims_input_metadata' not in item:
             skipped += 1
             continue
 
-        num_utterances = len(item['input_line_metadata'])
+        valid_indices = {line['index'] for line in item['subclaims_input_metadata']}
+        num_utterances = len(valid_indices)
         if num_utterances == 0:
             skipped += 1
             continue
 
         cited_indices = {idx for meta in item['subclaims_input_metadata'] for idx in meta['citations']}
-        num_cited = len(cited_indices)
+        num_cited = len(cited_indices & valid_indices)
 
         per_example[eid_str] = {
             "num_utterances": num_utterances,
