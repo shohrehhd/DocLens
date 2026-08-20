@@ -124,7 +124,7 @@ if __name__ == "__main__":
     # claim_recall_input, claim_groundedness, and reference_groundedness are only
     # produced by claim_evaluation/run_entailment.py (GPT), which doesn't suffix
     # its savefile with eval_model, unlike claim_recall/claim_precision above.
-    score_file_claim_recall_input = result_file.replace('.json', '.input_claim_min1max30.claim_recall_input_scores')
+    score_file_claim_recall_input = result_file.replace('.json', '.input_claim_unbounded.claim_recall_input_scores')
     score_file_claim_groundedness = result_file.replace('.json', '.output_claim_min1max30.claim_groundedness_scores')
     score_file_reference_groundedness = result_file.replace('.json', '.claim_min1max30.reference_groundedness_scores')
 
