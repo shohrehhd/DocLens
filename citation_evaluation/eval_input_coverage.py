@@ -20,10 +20,12 @@ if __name__ == "__main__":
 
     result_file = args.result_file
     savefile = result_file.replace('.json', '.input_citation_coverage.json')
+    uncited_savefile = result_file.replace('.json', '.uncited_utterances.json')
 
     data = json.load(open(result_file))
 
     per_example = {}
+    uncited_per_example = {}
     skipped = 0
     for item in data:
         eid_str = str(item['example_id'])
@@ -32,7 +34,9 @@ if __name__ == "__main__":
             skipped += 1
             continue
 
-        valid_indices = {int(idx) for idx in UTTERANCE_RE.findall(item['input'])}
+        lines_by_index = {int(m.group(1)): line for line in item['input'].split('\n')
+                           for m in [UTTERANCE_RE.match(line)] if m}
+        valid_indices = set(lines_by_index)
         num_utterances = len(valid_indices)
         if num_utterances == 0:
             skipped += 1
@@ -47,10 +51,15 @@ if __name__ == "__main__":
             "coverage": num_cited / num_utterances,
         }
 
+        uncited_indices = valid_indices - cited_indices
+        uncited_per_example[eid_str] = [lines_by_index[idx] for idx in sorted(uncited_indices)]
+
     mean_coverage = sum(x["coverage"] for x in per_example.values()) / len(per_example) if per_example else 0.0
 
     results = {"per_example": per_example, "mean_coverage": mean_coverage}
     json.dump(results, open(savefile, 'w'), indent=4, sort_keys=True)
+    json.dump(uncited_per_example, open(uncited_savefile, 'w'), indent=4, sort_keys=True)
 
     print(f"Saved coverage for {len(per_example)} examples ({skipped} skipped) to {savefile}")
     print(f"Mean utterance coverage: {mean_coverage:.2%}")
+    print(f"Saved uncited utterances to {uncited_savefile}")
