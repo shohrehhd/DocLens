@@ -121,9 +121,16 @@ if __name__ == "__main__":
             
         score_file_citations = result_file.replace('.json', f'.citations.score.{eval_model}')
 
-            
+    # claim_recall_input, claim_groundedness, and reference_groundedness are only
+    # produced by claim_evaluation/run_entailment.py (GPT), which doesn't suffix
+    # its savefile with eval_model, unlike claim_recall/claim_precision above.
+    score_file_claim_recall_input = result_file.replace('.json', '.input_claim_min1max30.claim_recall_input_scores')
+    score_file_claim_groundedness = result_file.replace('.json', '.output_claim_min1max30.claim_groundedness_scores')
+    score_file_reference_groundedness = result_file.replace('.json', '.claim_min1max30.reference_groundedness_scores')
+
+
     SCORES = {k:{'total': 0} for k in ['claim_recall', 'claim_precision', 'citation_recall', 'citation_precision']}
-            
+
     if args.eval_claim_recall:
         claim_recall_scores = json.load(open(score_file_claim_recall, 'r'))
         if dataset_name == 'meqsum' and eval_model != 'TRUE':
@@ -146,9 +153,25 @@ if __name__ == "__main__":
             
         SCORES['claim_precision'] = get_claim_scores(claim_precision_scores)
         
+    if args.eval_claim_recall_input:
+        claim_recall_input_scores = json.load(open(score_file_claim_recall_input, 'r'))
+        SCORES['claim_recall_input'] = get_claim_scores(claim_recall_input_scores)
+
+    if args.eval_claim_groundedness:
+        claim_groundedness_scores = json.load(open(score_file_claim_groundedness, 'r'))
+        SCORES['claim_groundedness'] = get_claim_scores(claim_groundedness_scores)
+
+    if args.eval_reference_groundedness:
+        reference_groundedness_scores = json.load(open(score_file_reference_groundedness, 'r'))
+        SCORES['reference_groundedness'] = get_claim_scores(reference_groundedness_scores)
+
     if args.eval_citations:
         citation_scores = json.load(open(score_file_citations, 'r'))
-        
+
         SCORES.update(get_citation_scores(citation_scores))
-        
+
     print(json.dumps(SCORES, indent=4))
+
+    summary_file = result_file.replace('.json', f'.aggregate_scores.{eval_model}.json' if eval_model else '.aggregate_scores.json')
+    json.dump(SCORES, open(summary_file, 'w'), indent=4)
+    print(f"Saved aggregate scores to {summary_file}")
